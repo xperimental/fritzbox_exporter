@@ -26,15 +26,15 @@ import (
 )
 
 var (
-	flag_test = flag.Bool("test", false, "print all available metrics to stdout")
-	flag_addr = flag.String("listen-address", ":9133", "The address to listen on for HTTP requests.")
+	flagTest = flag.Bool("test", false, "print all available metrics to stdout")
+	flagAddr = flag.String("listen-address", ":9133", "The address to listen on for HTTP requests.")
 
-	flag_gateway_address = flag.String("gateway-address", "fritz.box", "The URL of the upnp service")
-	flag_gateway_port    = flag.Int("gateway-port", 49000, "The URL of the upnp service")
+	flagGatewayAddress = flag.String("gateway-address", "fritz.box", "The URL of the upnp service")
+	flagGatewayPort    = flag.Int("gateway-port", 49000, "The URL of the upnp service")
 )
 
 func test() {
-	root, err := upnp.LoadServices(*flag_gateway_address, uint16(*flag_gateway_port))
+	root, err := upnp.LoadServices(*flagGatewayAddress, uint16(*flagGatewayPort))
 	if err != nil {
 		panic(err)
 	}
@@ -62,17 +62,15 @@ func test() {
 func main() {
 	flag.Parse()
 
-	if *flag_test {
+	if *flagTest {
 		test()
 		return
 	}
 
-	collector := collector.New(*flag_gateway_address, uint16(*flag_gateway_port))
+	collector := collector.New(*flagGatewayAddress, uint16(*flagGatewayPort))
 	prometheus.MustRegister(collector)
-
-	go collector.LoadServices()
 
 	http.Handle("/metrics", prometheus.Handler())
 	http.Handle("/", http.RedirectHandler("/metrics", http.StatusFound))
-	http.ListenAndServe(*flag_addr, nil)
+	http.ListenAndServe(*flagAddr, nil)
 }

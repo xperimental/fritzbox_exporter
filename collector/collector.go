@@ -12,7 +12,7 @@ import (
 
 const serviceLoadRetryTime = 1 * time.Minute
 
-type Metric struct {
+type metric struct {
 	Service string
 	Action  string
 	Result  string
@@ -22,7 +22,7 @@ type Metric struct {
 	MetricType prometheus.ValueType
 }
 
-var metrics = []*Metric{
+var metrics = []*metric{
 	{
 		Service: "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1",
 		Action:  "GetTotalPacketsReceived",
@@ -135,7 +135,7 @@ var metrics = []*Metric{
 	},
 }
 
-type FritzboxCollector struct {
+type fritzboxCollector struct {
 	Gateway string
 	Port    uint16
 
@@ -144,8 +144,9 @@ type FritzboxCollector struct {
 	Root       *upnp.Root
 }
 
-func New(gateway string, port uint16) *FritzboxCollector {
-	return &FritzboxCollector{
+// New creates a new prometheus collector which fetches metrics from a FritzBox UPNP interface.
+func New(gateway string, port uint16) prometheus.Collector {
+	collector := &fritzboxCollector{
 		Gateway: gateway,
 		Port:    port,
 		errors: prometheus.NewCounter(prometheus.CounterOpts{
@@ -153,10 +154,13 @@ func New(gateway string, port uint16) *FritzboxCollector {
 			Help: "Number of collection errors.",
 		}),
 	}
+	go collector.LoadServices()
+
+	return collector
 }
 
 // LoadServices tries to load the service information. Retries until success.
-func (fc *FritzboxCollector) LoadServices() {
+func (fc *fritzboxCollector) LoadServices() {
 	for {
 		root, err := upnp.LoadServices(fc.Gateway, fc.Port)
 		if err != nil {
@@ -175,14 +179,14 @@ func (fc *FritzboxCollector) LoadServices() {
 	}
 }
 
-func (fc *FritzboxCollector) Describe(ch chan<- *prometheus.Desc) {
+func (fc *fritzboxCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, m := range metrics {
 		ch <- m.Desc
 	}
 	ch <- fc.errors.Desc()
 }
 
-func (fc *FritzboxCollector) Collect(ch chan<- prometheus.Metric) {
+func (fc *fritzboxCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- fc.errors
 
 	fc.Lock()
@@ -195,12 +199,12 @@ func (fc *FritzboxCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	var err error
-	var last_service string
-	var last_method string
-	var last_result upnp.Result
+	var lastService string
+	var lastMethod string
+	var lastResult upnp.Result
 
 	for _, m := range metrics {
-		if m.Service != last_service || m.Action != last_method {
+		if m.Service != lastService || m.Action != lastMethod {
 			service, ok := root.Services[m.Service]
 			if !ok {
 				// TODO
@@ -215,7 +219,7 @@ func (fc *FritzboxCollector) Collect(ch chan<- prometheus.Metric) {
 				continue
 			}
 
-			last_result, err = action.Call()
+			lastResult, err = action.Call()
 			if err != nil {
 				fmt.Println(err)
 				fc.errors.Inc()
@@ -223,7 +227,7 @@ func (fc *FritzboxCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 
-		val, ok := last_result[m.Result]
+		val, ok := lastResult[m.Result]
 		if !ok {
 			fmt.Println("result not found", m.Result)
 			fc.errors.Inc()
