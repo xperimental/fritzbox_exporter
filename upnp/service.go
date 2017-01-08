@@ -1,5 +1,5 @@
-// Query UPNP variables from Fritz!Box devices.
-package fritzbox_upnp
+// Package upnp can query UPNP variables from Fritz!Box devices.
+package upnp
 
 // Copyright 2016 Nils Decker
 //
@@ -40,7 +40,7 @@ var ErrInvalidSOAPResponse = errors.New("invalid SOAP response")
 // Root of the UPNP tree
 type Root struct {
 	BaseUrl  string
-	Device   Device `xml:"device"`
+	Device   Device              `xml:"device"`
 	Services map[string]*Service // Map of all services indexed by .ServiceType
 }
 
@@ -75,7 +75,7 @@ type Service struct {
 	SCPDUrl     string `xml:"SCPDURL"`
 
 	Actions        map[string]*Action // All actions available on the service
-	StateVariables []*StateVariable // All state variables available on the service
+	StateVariables []*StateVariable   // All state variables available on the service
 }
 
 type scpdRoot struct {
@@ -87,8 +87,8 @@ type scpdRoot struct {
 type Action struct {
 	service *Service
 
-	Name        string      `xml:"name"`
-	Arguments   []*Argument `xml:"argumentList>argument"`
+	Name        string               `xml:"name"`
+	Arguments   []*Argument          `xml:"argumentList>argument"`
 	ArgumentMap map[string]*Argument // Map of arguments indexed by .Name
 }
 

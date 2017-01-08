@@ -22,7 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ndecker/fritzbox_exporter/collector"
-	upnp "github.com/ndecker/fritzbox_exporter/fritzbox_upnp"
+	"github.com/ndecker/fritzbox_exporter/upnp"
 )
 
 func test(address string, port uint16) {
