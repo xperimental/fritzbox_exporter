@@ -15,8 +15,8 @@ package main
 // limitations under the License.
 
 import (
-	"flag"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,16 +25,8 @@ import (
 	upnp "github.com/ndecker/fritzbox_exporter/fritzbox_upnp"
 )
 
-var (
-	flagTest = flag.Bool("test", false, "print all available metrics to stdout")
-	flagAddr = flag.String("listen-address", ":9133", "The address to listen on for HTTP requests.")
-
-	flagGatewayAddress = flag.String("gateway-address", "fritz.box", "The URL of the upnp service")
-	flagGatewayPort    = flag.Int("gateway-port", 49000, "The URL of the upnp service")
-)
-
-func test() {
-	root, err := upnp.LoadServices(*flagGatewayAddress, uint16(*flagGatewayPort))
+func test(address string, port uint16) {
+	root, err := upnp.LoadServices(address, port)
 	if err != nil {
 		panic(err)
 	}
@@ -60,17 +52,22 @@ func test() {
 }
 
 func main() {
-	flag.Parse()
+	cfg, err := parseFlags()
+	if err != nil {
+		log.Fatalf("Error in parameters: %s", err)
+	}
 
-	if *flagTest {
-		test()
+	if cfg.Test {
+		test(cfg.GatewayAddress, uint16(cfg.GatewayPort))
 		return
 	}
 
-	collector := collector.New(*flagGatewayAddress, uint16(*flagGatewayPort))
+	collector := collector.New(cfg.GatewayAddress, uint16(cfg.GatewayPort))
 	prometheus.MustRegister(collector)
 
 	http.Handle("/metrics", prometheus.Handler())
 	http.Handle("/", http.RedirectHandler("/metrics", http.StatusFound))
-	http.ListenAndServe(*flagAddr, nil)
+
+	log.Printf("Listening on %s...", cfg.Addr)
+	log.Fatal(http.ListenAndServe(cfg.Addr, nil))
 }
