@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/ndecker/fritzbox_exporter/collector"
+	"github.com/ndecker/fritzbox_exporter/home"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -35,6 +36,11 @@ func main() {
 
 	collector := collector.New(cfg.GatewayAddress, uint16(cfg.GatewayPort))
 	prometheus.MustRegister(collector)
+
+	if len(cfg.GatewayPassword) > 0 {
+		homeCollector := home.NewCollector(cfg.GatewayAddress, cfg.GatewayPassword)
+		prometheus.MustRegister(homeCollector)
+	}
 
 	http.Handle("/metrics", prometheus.Handler())
 	http.Handle("/", http.RedirectHandler("/metrics", http.StatusFound))

@@ -7,24 +7,27 @@ import (
 )
 
 type config struct {
-	Test           bool
-	Addr           string
-	GatewayAddress string
-	GatewayPort    int
+	Test            bool
+	Addr            string
+	GatewayAddress  string
+	GatewayPort     int
+	GatewayPassword string
 }
 
 func parseFlags() (config, error) {
 	cfg := config{
-		Test:           false,
-		Addr:           ":9133",
-		GatewayAddress: "fritz.box",
-		GatewayPort:    49000,
+		Test:            false,
+		Addr:            ":9133",
+		GatewayAddress:  "fritz.box",
+		GatewayPort:     49000,
+		GatewayPassword: "",
 	}
 
 	flag.BoolVar(&cfg.Test, "test", cfg.Test, "print all available metrics to stdout")
 	flag.StringVar(&cfg.Addr, "listen-address", cfg.Addr, "The address to listen on for HTTP requests.")
 	flag.StringVar(&cfg.GatewayAddress, "gateway-address", cfg.GatewayAddress, "The URL of the upnp service")
 	flag.IntVar(&cfg.GatewayPort, "gateway-port", cfg.GatewayPort, "The URL of the upnp service")
+	flag.StringVar(&cfg.GatewayPassword, "gateway-password", cfg.GatewayPassword, "Password for the router admin interface.")
 	flag.Parse()
 
 	if len(cfg.Addr) == 0 {
