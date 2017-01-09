@@ -2,23 +2,17 @@
 package home
 
 import (
-	"errors"
+	"encoding/xml"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
-
-	htmlquery "github.com/antchfx/xquery/html"
-	"golang.org/x/net/html"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
-	homeURLFormat = "http://%s/net/home_auto_overview.lua?sid=%s&update=uiSmarthomeTables&view=&xhr=1"
+	homeURLFormat = "http://%s/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos&sid=%s"
 )
 
 var (
@@ -151,80 +145,55 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 		return result, fmt.Errorf("invalid status code: %d", res.StatusCode)
 	}
 
-	if err := parseHomeData(&result, res.Body); err != nil {
+	var homeData homeDeviceList
+	if err := xml.NewDecoder(res.Body).Decode(&homeData); err != nil {
 		return result, err
 	}
 
+	for _, d := range homeData.Devices {
+		if d.Functions&(functionHeating+functionTemperature) > 0 {
+			name := d.Name
+			temp := float64(d.Heating.Current) * 0.5
+			targetTemp := float64(d.Heating.Target) * 0.5
+
+			result.Thermostats = append(result.Thermostats, thermostat{
+				Name:               name,
+				CurrentTemperature: temp,
+				TargetTemperature:  targetTemp,
+			})
+		}
+	}
 	return result, nil
 }
 
-func parseHomeData(result *homeData, r io.Reader) error {
-	contextNode := &html.Node{
-		Type: html.ElementNode,
-	}
-	nodes, err := html.ParseFragment(r, contextNode)
-	if err != nil {
-		return err
-	}
+const (
+	functionHeating     = 1 << 6
+	functionTemperature = 1 << 8
+)
 
-	for _, node := range nodes {
-		if node.Type == html.ElementNode && node.Data == "table" {
-			return parseTableNode(result, node)
-		}
-	}
-
-	return errors.New("no table node found")
+type homeDeviceList struct {
+	Version int          `xml:"version,attr"`
+	Devices []homeDevice `xml:"device"`
 }
 
-func parseTableNode(result *homeData, table *html.Node) error {
-	items := htmlquery.Find(table, "//tr")
-itemLoop:
-	for _, item := range items {
-		for _, a := range item.Attr {
-			if a.Key == "class" && a.Val == "thead" {
-				continue itemLoop
-			}
-		}
+type homeDevice struct {
+	ID          int             `xml:"id,attr"`
+	Name        string          `xml:"name"`
+	Functions   int             `xml:"functionbitmask,attr"`
+	Temperature homeTemperature `xml:"temperature"`
+	Heating     homeHeating     `xml:"hkr"`
+}
 
-		nameNode := htmlquery.FindOne(item, "//td[@class='name cut_overflow']/span/text()")
-		if nameNode == nil {
-			log.Println("Warning: no name node found")
-			continue
-		}
+// Values as int in 0.1°C increments (220 == 22.5°C)
+type homeTemperature struct {
+	Celsius int `xml:"celsius"`
+	Offset  int `xml:"offset"`
+}
 
-		tempNode := htmlquery.FindOne(item, "//td[@class='temperature']/text()")
-		if tempNode == nil {
-			log.Println("Warning: no temperature node found")
-			continue
-		}
-
-		targetTempNodes := htmlquery.Find(item, "//td[@class='target_temperature']//span[@class='numdisplay']/span/text()")
-		if len(targetTempNodes) != 2 {
-			log.Printf("Warning: not two elements in target temperature %d", len(targetTempNodes))
-			continue
-		}
-
-		name := strings.TrimSpace(nameNode.Data)
-		tempStr := strings.Replace(strings.Trim(tempNode.Data, " \n°C"), ",", ".", 1)
-		targetTempStr := strings.Replace(strings.TrimSpace(targetTempNodes[0].Data), ",", ".", 1)
-
-		temp, err := strconv.ParseFloat(tempStr, 64)
-		if err != nil {
-			log.Printf("Error parsing temperature: %s", err)
-			continue
-		}
-
-		targetTemp, err := strconv.ParseFloat(targetTempStr, 64)
-		if err != nil {
-			log.Printf("Error parsing target temperature: %s", err)
-			continue
-		}
-
-		result.Thermostats = append(result.Thermostats, thermostat{
-			Name:               name,
-			CurrentTemperature: temp,
-			TargetTemperature:  targetTemp,
-		})
-	}
-	return nil
+// Values as int in 0.5°C increments (8 == 16°C)
+type homeHeating struct {
+	Current int `xml:"tist"`
+	Target  int `xml:"tsoll"`
+	Comfort int `xml:"komfort"`
+	Night   int `xml:"absenk"`
 }
