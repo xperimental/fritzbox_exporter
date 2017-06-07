@@ -13,6 +13,11 @@ import (
 
 const (
 	homeURLFormat = "http://%s/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos&sid=%s"
+
+	functionHeating     = 1 << 6
+	functionTemperature = 1 << 8
+
+	thermostatTargetTempOff = 126.5
 )
 
 var (
@@ -109,7 +114,10 @@ func (c *homeCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		sendMetric(ch, tempDesc, th.CurrentTemperature, labels)
-		sendMetric(ch, targetTempDesc, th.TargetTemperature, labels)
+
+		if th.TargetTemperature != thermostatTargetTempOff {
+			sendMetric(ch, targetTempDesc, th.TargetTemperature, labels)
+		}
 	}
 }
 
@@ -165,11 +173,6 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 	}
 	return result, nil
 }
-
-const (
-	functionHeating     = 1 << 6
-	functionTemperature = 1 << 8
-)
 
 type homeDeviceList struct {
 	Version int          `xml:"version,attr"`
