@@ -40,6 +40,26 @@ var (
 		"fritzbox_home_target_temperature_celsius",
 		"Target temperature setting of home automation device in celsius.",
 		varLabels, nil)
+	switchStateDesc = prometheus.NewDesc(
+		"fritzbox_home_switch_state",
+		"State of power switch.",
+		varLabels, nil)
+	powerDesc = prometheus.NewDesc(
+		"fritzbox_home_power_watt",
+		"Current power measurement in watt.",
+		varLabels, nil)
+	energyDesc = prometheus.NewDesc(
+		"fritzbox_home_energy_watthours",
+		"Energy consumption in watt-hours.",
+		varLabels, nil)
+
+	dynamicDescs = []*prometheus.Desc{
+		tempDesc,
+		targetTempDesc,
+		switchStateDesc,
+		powerDesc,
+		energyDesc,
+	}
 )
 
 // NewCollector creates a new collector for the specified host.
@@ -81,8 +101,10 @@ type homeCollector struct {
 func (c *homeCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.UpMetric.Desc()
 	ch <- c.AuthMetric.Desc()
-	ch <- tempDesc
-	ch <- targetTempDesc
+
+	for _, d := range dynamicDescs {
+		ch <- d
+	}
 }
 
 func (c *homeCollector) Collect(ch chan<- prometheus.Metric) {
@@ -124,6 +146,23 @@ func (c *homeCollector) Collect(ch chan<- prometheus.Metric) {
 		if th.TargetTemperature != thermostatTargetTempOff {
 			sendMetric(ch, targetTempDesc, th.TargetTemperature, labels)
 		}
+	}
+
+	for _, sw := range home.Switches {
+		labels := []string{
+			c.Hostname,
+			sw.Name,
+		}
+
+		state := 0.0
+		if sw.On {
+			state = 1.0
+		}
+
+		sendMetric(ch, switchStateDesc, state, labels)
+		sendMetric(ch, powerDesc, sw.CurrentPower, labels)
+		sendMetric(ch, energyDesc, sw.UsedEnergy, labels)
+		sendMetric(ch, tempDesc, sw.CurrentTemperature, labels)
 	}
 }
 
