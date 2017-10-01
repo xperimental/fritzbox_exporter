@@ -11,15 +11,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type function int
+
 const (
 	homeURLFormat = "http://%s/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos&sid=%s"
 
-	functionAlarm       = 1 << 4
-	functionHeating     = 1 << 6
-	functionEnergy      = 1 << 7
-	functionTemperature = 1 << 8
-	functionSwitch      = 1 << 9
-	functionRepeater    = 1 << 10
+	functionAlarm       function = 1 << 4
+	functionHeating     function = 1 << 6
+	functionEnergy      function = 1 << 7
+	functionTemperature function = 1 << 8
+	functionSwitch      function = 1 << 9
+	functionRepeater    function = 1 << 10
 
 	thermostatTargetTempOff = 126.5
 )
@@ -163,7 +165,7 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 	}
 
 	for _, d := range homeData.Devices {
-		if d.Functions&(functionHeating+functionTemperature) == functionHeating+functionTemperature {
+		if d.hasFunctions(functionHeating, functionTemperature) {
 			name := d.Name
 			temp := float64(d.Heating.Current) * 0.5
 			targetTemp := float64(d.Heating.Target) * 0.5
@@ -189,6 +191,15 @@ type homeDevice struct {
 	Functions   int             `xml:"functionbitmask,attr"`
 	Temperature homeTemperature `xml:"temperature"`
 	Heating     homeHeating     `xml:"hkr"`
+}
+
+func (d homeDevice) hasFunctions(functions ...function) bool {
+	for _, f := range functions {
+		if d.Functions&int(f) == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // Values as int in 0.1°C increments (220 == 22.5°C)
