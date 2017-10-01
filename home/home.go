@@ -159,7 +159,7 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 	}
 
 	for _, d := range homeData.Devices {
-		if d.Functions&(functionHeating+functionTemperature) > 0 {
+		if d.Functions&(functionHeating+functionTemperature) == functionHeating+functionTemperature {
 			name := d.Name
 			temp := float64(d.Heating.Current) * 0.5
 			targetTemp := float64(d.Heating.Target) * 0.5
