@@ -14,8 +14,12 @@ import (
 const (
 	homeURLFormat = "http://%s/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos&sid=%s"
 
+	functionAlarm       = 1 << 4
 	functionHeating     = 1 << 6
+	functionEnergy      = 1 << 7
 	functionTemperature = 1 << 8
+	functionSwitch      = 1 << 9
+	functionRepeater    = 1 << 10
 
 	thermostatTargetTempOff = 126.5
 )
