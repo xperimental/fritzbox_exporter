@@ -138,12 +138,22 @@ func sendMetric(ch chan<- prometheus.Metric, desc *prometheus.Desc, value float6
 
 type homeData struct {
 	Thermostats []thermostat
+	Switches    []powerSwitch
 }
 
 type thermostat struct {
 	Name               string
 	CurrentTemperature float64
 	TargetTemperature  float64
+}
+
+type powerSwitch struct {
+	Name               string
+	On                 bool
+	Mode               string
+	CurrentPower       float64
+	UsedEnergy         float64
+	CurrentTemperature float64
 }
 
 func (c *homeCollector) getHomeData() (homeData, error) {
@@ -165,7 +175,8 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 	}
 
 	for _, d := range homeData.Devices {
-		if d.hasFunctions(functionHeating, functionTemperature) {
+		switch {
+		case d.hasFunctions(functionHeating, functionTemperature):
 			name := d.Name
 			temp := float64(d.Heating.Current) * 0.5
 			targetTemp := float64(d.Heating.Target) * 0.5
@@ -174,6 +185,15 @@ func (c *homeCollector) getHomeData() (homeData, error) {
 				Name:               name,
 				CurrentTemperature: temp,
 				TargetTemperature:  targetTemp,
+			})
+		case d.hasFunctions(functionEnergy, functionSwitch, functionTemperature):
+			result.Switches = append(result.Switches, powerSwitch{
+				Name:               d.Name,
+				On:                 d.Switch.State,
+				Mode:               d.Switch.Mode,
+				CurrentPower:       float64(d.PowerMeter.Power) / 1000,
+				UsedEnergy:         float64(d.PowerMeter.Energy),
+				CurrentTemperature: float64(d.Temperature.Celsius) / 10,
 			})
 		}
 	}
@@ -191,6 +211,8 @@ type homeDevice struct {
 	Functions   int             `xml:"functionbitmask,attr"`
 	Temperature homeTemperature `xml:"temperature"`
 	Heating     homeHeating     `xml:"hkr"`
+	Switch      homeSwitch      `xml:"switch"`
+	PowerMeter  homePowerMeter  `xml:"powermeter"`
 }
 
 func (d homeDevice) hasFunctions(functions ...function) bool {
@@ -214,4 +236,16 @@ type homeHeating struct {
 	Target  int `xml:"tsoll"`
 	Comfort int `xml:"komfort"`
 	Night   int `xml:"absenk"`
+}
+
+type homeSwitch struct {
+	State      bool   `xml:"state"`
+	Mode       string `xml:"mode"` // Either "auto" or "manuell"
+	Lock       bool   `xml:"lock"`
+	DeviceLock bool   `xml:"devicelock"`
+}
+
+type homePowerMeter struct {
+	Power  int `xml:"power"`  // Power in Milliwatt (0.001 W)
+	Energy int `xml:"energy"` // Energy in Watt-Hours
 }
